@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Visualización de Rutas de Bicicletas</title>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<script src="https://unpkg.com/deck.gl@8.9.24/dist.min.js">
+map.on('load', () => {
+  const scale = new mapboxgl.ScaleControl({
+    maxWidth: 100,
+    unit: 'metric'
+  });
+  map.addControl(scale, 'bottom-right');
+});
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7">
+map.on('load', () => {
+  const scale = new mapboxgl.ScaleControl({
+    maxWidth: 100,
+    unit: 'metric'
+  });
+  map.addControl(scale, 'bottom-right');
+});
+
+</script>
+<style>
+    body { margin: 0; font-family: sans-serif; }
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 8px;
+    }
+    select {
+      margin: 5px 0;
+      width: 120px;
+    }
+    #map {
+      position: absolute;
+      top: 0; bottom: 0; left: 0; right: 0;
+    }
+  </style>
+<style>
+#escala {
+  position: absolute;
+  bottom: 10px;
+  right: 20px;
+  background: rgba(255,255,255,0.8);
+  padding: 4px 10px;
+  font-size: 13px;
+  font-family: sans-serif;
+  border-radius: 4px;
+  z-index: 10;
+}
+</style>
+
+</head>
+<body>
+<div id="controls">
+<label>Grosor:
+      <input id="width-slider" max="10" min="1" step="1" type="range" value="2"/>
+</label><br/>
+<label>Opacidad:
+      <input id="opacity-slider" max="1" min="0.1" step="0.1" type="range" value="1"/>
+</label><br/>
+<label>Año:
+      <select id="year-filter">
+<option value="all">Todos</option>
+</select>
+</label><br/>
+<label>Semestre:
+      <select id="semester-filter">
+<option value="all">Ambos</option>
+<option value="sem1">Semestre 1</option>
+<option value="sem2">Semestre 2</option>
+</select>
+</label>
+</div>
+<div id="map"></div>
+<script>
+    const DATA_URL = 'rutas_bicicletas.geojson';
+    let allData = [];
+
+    const viewState = {
+      longitude: -63.17,
+      latitude: -17.8,
+      zoom: 11,
+      pitch: 0,
+      bearing: 0
+    };
+
+    const tileLayer = new deck.TileLayer({
+      id: 'osm-tiles',
+      data: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      minZoom: 0,
+      maxZoom: 19,
+      tileSize: 256,
+      renderSubLayers: props => {
+        const {
+          bbox: {west, south, east, north}
+        } = props.tile;
+        return new deck.BitmapLayer(props, {
+          data: null,
+          image: props.data,
+          bounds: [west, south, east, north]
+        });
+      }
+    });
+
+    let rutasLayer = null;
+
+    const deckgl = new deck.DeckGL({
+      container: 'map',
+      initialViewState: viewState,
+      controller: true,
+      layers: [tileLayer]
+    });
+
+    function updateLayers(data) {
+      rutasLayer = new deck.GeoJsonLayer({
+        id: 'rutas-layer',
+        data: data,
+        pickable: true,
+        stroked: true,
+        filled: false,
+        lineWidthScale: 1,
+        lineWidthMinPixels: 1.5,
+        getLineColor: [200, 0, 0],
+        opacity: parseFloat(document.getElementById('opacity-slider').value),
+        getLineWidth: parseInt(document.getElementById('width-slider').value),
+        getTooltip: ({object}) => object && `Archivo: ${object.properties.archivo_origen}`
+      });
+
+      deckgl.setProps({ layers: [tileLayer, rutasLayer] });
+    }
+
+    function populateFilters(data) {
+      const yearFilter = document.getElementById('year-filter');
+      const years = Array.from(new Set(data.map(d => d.properties.anio))).sort();
+      for (const y of years) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.text = y;
+        yearFilter.appendChild(opt);
+      }
+    }
+
+    function applyFilters() {
+      const selectedYear = document.getElementById('year-filter').value;
+      const selectedSemester = document.getElementById('semester-filter').value;
+
+      const filtered = allData.filter(d => {
+        const props = d.properties;
+        return (selectedYear === 'all' || props.anio == selectedYear) &&
+               (selectedSemester === 'all' || props.semestre === selectedSemester);
+      });
+
+      updateLayers(filtered);
+    }
+
+    d3.json(DATA_URL).then(geojson => {
+      allData = geojson.features;
+      populateFilters(allData);
+      applyFilters();
+    });
+
+    document.getElementById('year-filter').addEventListener('change', applyFilters);
+    document.getElementById('semester-filter').addEventListener('change', applyFilters);
+    document.getElementById('width-slider').addEventListener('input', applyFilters);
+    document.getElementById('opacity-slider').addEventListener('input', applyFilters);
+  
+map.on('load', () => {
+  const scale = new mapboxgl.ScaleControl({
+    maxWidth: 100,
+    unit: 'metric'
+  });
+  map.addControl(scale, 'bottom-right');
+});
+
+</script>
+<div id="titulo-mapa">MIS BICI PASEOS 2016-2021</div>
+<style>
+  #titulo-mapa {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    background: rgba(255,255,255,0.8);
+    padding: 6px 12px;
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-radius: 6px;
+    z-index: 10;
+  }
+</style>
+<div id="escala">1 km ≈ ●───────</div></body>
+</html>
